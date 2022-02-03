@@ -54131,6 +54131,40 @@ void qsort_uint(npy_uint* arr, npy_intp left, npy_intp right, npy_int max_iters)
     if (pivot != biggest)
         qsort_uint(arr, pivot_index, right, max_iters - 1);
 }
+
+static inline __attribute__((target("avx512f,avx512dq,avx512vl,avx512bw,avx512cd")))
+void qsort_uint2(npy_uint* arr, npy_intp left, npy_intp right, npy_int max_iters)
+{
+
+
+
+    if (max_iters <= 0) {
+        heapsort_uint((void*)(arr + left), right + 1 - left, 
+# 501 "numpy/core/src/npysort/qsort-32bit-avx512.h" 3 4
+                                                            ((void *)0)
+# 501 "numpy/core/src/npysort/qsort-32bit-avx512.h"
+                                                                );
+        return;
+    }
+
+    if (right + 1 - left <= 128) {
+        sort_128_epu32(arr + left, right + 1 -left);
+        return;
+    }
+
+    npy_uint pivot = get_pivot_epu32(arr, left + (max_iters % 8), right - (max_iters % 8));
+    npy_uint smallest = 4294967295U;
+    npy_uint biggest = 0;
+    npy_intp pivot_index = partition_avx512_epu32(arr, left, right+1, pivot, &smallest, &biggest);
+
+    if (pivot != smallest)
+        qsort_uint2(arr, left, pivot_index - 1, max_iters - 1);
+    if (pivot != biggest)
+        qsort_uint2(arr, pivot_index, right, max_iters - 1);
+}
+
+
+
 # 85 "numpy/core/src/npysort/qsort-32bit-avx512.h"
 # 99 "numpy/core/src/npysort/qsort-32bit-avx512.h"
 static inline __attribute__((target("avx512f,avx512dq,avx512vl,avx512bw,avx512cd")))
@@ -54794,6 +54828,22 @@ void avx512_qsort_uint(npy_uint* arr, npy_intp arrsize)
 
     }
 }
+
+
+
+void avx512_qsort_uint2(npy_uint* arr, npy_intp arrsize)
+{
+    if (arrsize > 1) {
+#if 0
+        npy_intp nan_count = replace_nan_with_inf(arr, arrsize);
+#endif
+        qsort_uint2(arr, 0, arrsize-1, 2*log2(arrsize));
+#if 0
+        replace_inf_with_nan(arr, arrsize, nan_count);
+#endif
+    }
+}
+
 # 557 "numpy/core/src/npysort/qsort-32bit-avx512.h"
 
 void avx512_qsort_float(npy_float* arr, npy_intp arrsize)
@@ -54808,3 +54858,6 @@ void avx512_qsort_float(npy_float* arr, npy_intp arrsize)
 
     }
 }
+
+
+

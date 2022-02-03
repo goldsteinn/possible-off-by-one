@@ -1,14 +1,17 @@
+//#include <stdlib.h>
 #include <assert.h>
 
-#define heapsort_int(...) assert(0 && "Reached Heapsort")
-#define heapsort_uint(...) assert(0 && "Reached Heapsort")
-#define heapsort_float(...) assert(0 && "Reached Heapsort")
-
+int
+heapsort_uint(unsigned int *, long, void *);
+int
+heapsort_int(unsigned int *, long, void *);
+int
+heapsort_float(unsigned int *, long, void *);
 
 #include "npy-sort-avx512.h"
 
-#define TEST_SIZE 4096
-static npy_uint test[TEST_SIZE] = {
+#define TEST_SIZE (4096)
+static npy_uint test_data[TEST_SIZE] = {
         1073741823, 1073741824, 1073741825, 1073741826, 1073741827, 1073741828,
         1073741829, 1073741830, 1073741831, 1073741832, 1073741833, 1073741834,
         1073741835, 1073741836, 1073741837, 1073741838, 12,         13,
@@ -693,17 +696,37 @@ static npy_uint test[TEST_SIZE] = {
         6,          2,          3,          4,          5,          6,
         7,          8,          9,          10};
 
+#define NTESTS (1024)
+#define NTRIALS (30)
+#include "bench.h"
+
+make_bench(avx512_qsort_uint);
+make_bench(avx512_qsort_uint2);
 
 void
-check()
+init_sort_data(uint32_t *to_sort)
 {
-    for (uint32_t i = 1; i < TEST_SIZE; ++i) {
-        assert(test[i - 1] <= test[i]);
+    for (uint32_t i = 0; i < NTESTS; ++i) {
+        memcpy(to_sort + i * TEST_SIZE, test_data, TEST_SIZE * 4);
     }
 }
 
 int
 main()
 {
-    avx512_qsort_uint(test, TEST_SIZE);
+    uint32_t *to_sort =
+            (uint32_t *)aligned_alloc(4096, TEST_SIZE * NTESTS * 4);
+
+    uint64_t t0 = 0;
+    uint64_t t1 = 0;
+    for (uint32_t trials = NTRIALS; trials; --trials) {
+        init_sort_data(to_sort);
+        t0 += bench_avx512_qsort_uint(to_sort, to_sort + TEST_SIZE * NTESTS);
+
+        init_sort_data(to_sort);
+        t1 += bench_avx512_qsort_uint2(to_sort, to_sort + TEST_SIZE * NTESTS);
+    }
+
+    printf("avx512_qsort : %.3lf\n", (double)t0 / (double)(NTESTS * NTRIALS));
+    printf("avx512_qsort2: %.3lf\n", (double)t1 / (double)(NTESTS * NTRIALS));
 }
